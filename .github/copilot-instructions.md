@@ -83,6 +83,7 @@ adb version
 mkdir -p build/classes
 javac -cp $ANDROID_HOME/platforms/android-35/android.jar -d build/classes src/main/java/**/*.java
 ```
+Note: R class generation requires full build process with network dependencies - use resource references cautiously in offline environment.
 
 ## Project Structure
 

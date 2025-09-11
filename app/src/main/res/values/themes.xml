@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Base.Theme.NextGenAPK" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Customize your light theme here. -->
+        <item name="colorPrimary">@color/nextgen_primary</item>
+        <item name="colorSecondary">@color/nextgen_secondary</item>
+        <item name="colorError">@color/nextgen_error</item>
+    </style>
+
+    <style name="Theme.NextGenAPK" parent="Base.Theme.NextGenAPK" />
+</resources>

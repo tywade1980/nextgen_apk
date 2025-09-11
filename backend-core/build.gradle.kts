@@ -34,10 +34,6 @@ dependencies {
     implementation("com.h2database:h2") // For testing
     implementation("org.flywaydb:flyway-core")
     
-    // Vector Database Support
-    implementation("org.springframework.ai:spring-ai-pgvector-store:0.8.1")
-    implementation("org.springframework.ai:spring-ai-openai:0.8.1")
-    
     // API Documentation
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.2.0")
     
@@ -54,6 +50,4 @@ dependencies {
     // Testing
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
-    testImplementation("org.testcontainers:junit-jupiter")
-    testImplementation("org.testcontainers:postgresql")
 }

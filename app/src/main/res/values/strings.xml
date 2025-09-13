@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NextGen APK</string>
+    <string name="app_description">Voice-Driven Integration Platform</string>
+    
+    <!-- Voice Commands -->
+    <string name="voice_listening">Listening...</string>
+    <string name="voice_speak_prompt">Tap to speak</string>
+    <string name="voice_permission_required">Audio permission required for voice commands</string>
+    <string name="voice_not_available">Voice recognition not available</string>
+    
+    <!-- Status Messages -->
+    <string name="status_online">Online</string>
+    <string name="status_offline">Offline</string>
+    <string name="status_starting">Starting</string>
+    
+    <!-- Service Names -->
+    <string name="service_voice_engine">Voice Engine</string>
+    <string name="service_database">Database Layer</string>
+    <string name="service_backend">Backend Services</string>
+    <string name="service_mcp_server">MCP Server</string>
+    <string name="service_integration_hub">Integration Hub</string>
+    
+    <!-- Error Messages -->
+    <string name="error_service_init">Failed to initialize services</string>
+    <string name="error_voice_recognition">Voice recognition error</string>
+    <string name="error_database_connection">Database connection error</string>
+    <string name="error_network">Network error</string>
+    
+    <!-- Commands -->
+    <string name="command_status">System Status</string>
+    <string name="command_database">Database Operations</string>
+    <string name="command_integration">Integration Hub</string>
+    <string name="command_server">Server Management</string>
+    
+    <!-- Accessibility -->
+    <string name="cd_microphone">Microphone</string>
+    <string name="cd_microphone_off">Microphone off</string>
+    <string name="cd_settings">Settings</string>
+    
+    <!-- Notifications -->
+    <string name="notification_voice_service">Voice service running</string>
+    <string name="notification_backend_service">Backend services active</string>
+    <string name="notification_mcp_server">MCP server running</string>
+</resources>

@@ -1,161 +1,242 @@
 # NextGen APK Development Instructions
 
-NextGen APK is an Android application project. This repository currently contains minimal setup and is ready for Android development initialization.
+NextGen APK is a comprehensive, multi-module voice-driven integration platform combining Android application development with backend microservices, database integration, and AI/ML capabilities. This repository contains a complete full-stack system with Docker infrastructure.
 
 Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
 
 ## Working Effectively
 
 - **CRITICAL Environment Setup**:
-  - Android SDK is pre-installed at `/usr/local/lib/android/sdk`
+  - Use Gradle 8.4 (NOT the system default Gradle 9.0.0)
+  - Download and use Gradle 8.4: `wget https://services.gradle.org/distributions/gradle-8.4-bin.zip`
+  - Extract to `/tmp/gradle-8.4` and use `export GRADLE_HOME=/tmp/gradle-8.4 && export PATH=$GRADLE_HOME/bin:$PATH`
   - Java 17 is available at `/usr/bin/java`
-  - Gradle 9.0.0 is available at `/usr/bin/gradle`
-  - Kotlin 2.2.10 is available at `/usr/bin/kotlin`
+  - Docker Compose is available as `docker compose` (NOT `docker-compose`)
+  - Android SDK is available at `/usr/local/lib/android/sdk`
 
 - **Always set these environment variables before working**:
   ```bash
+  export GRADLE_HOME=/tmp/gradle-8.4
+  export PATH=$GRADLE_HOME/bin:$PATH
   export ANDROID_HOME=/usr/local/lib/android/sdk
   export PATH=$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/build-tools/35.0.0
   ```
 
-- **Initialize new Android project structure**:
-  ```bash
-  mkdir -p src/main/java/com/example/nextgen
-  mkdir -p src/main/res/layout
-  mkdir -p src/main/res/values
-  mkdir -p src/test/java
-  mkdir -p src/androidTest/java
-  ```
+- **Infrastructure Setup and Build Workflow**:
+  - **NEVER CANCEL**: Infrastructure setup takes 7-10 seconds. Build tasks take 3-60 seconds. Set timeouts to 120+ seconds minimum.
+  - Start infrastructure: `docker compose up -d postgres redis` -- takes ~7 seconds
+  - Stop infrastructure: `docker compose down` -- takes ~0.5 seconds
+  - Service status check: `docker compose ps`
+  - **CRITICAL**: Full project build has compilation errors in some modules (normal for active development codebase)
+  - Individual module builds work fine and are the recommended approach
 
-- **Build and Development Workflow**:
-  - **NEVER CANCEL**: Network access is restricted - Gradle builds that require internet will fail
-  - Build times: Manual compilation using Android SDK tools takes 2-5 minutes. NEVER CANCEL. Set timeout to 10+ minutes.
-  - Resource compilation: `aapt2 compile --dir src/main/res -o compiled_res.zip` -- takes less than 1 second for basic resources
-  - Use offline Android SDK tools for compilation and resource processing
-  - Full Gradle builds with network dependencies will fail due to firewall restrictions
+- **Build Commands with Validated Timings**:
+  - Download Gradle 8.4: ~1-2 seconds
+  - Project configuration: `gradle tasks` -- takes ~52 seconds (NEVER CANCEL)
+  - Shared module build: `gradle shared:build -x test` -- takes ~4.5 seconds  
+  - Backend service build: `gradle backend-core:build -x test` -- takes ~10 seconds
+  - Backend service startup: `gradle backend-core:bootRun` -- takes ~4 seconds to start
+  - Tests (shared): `gradle shared:test` -- takes ~3.6 seconds
+  - Android resource compilation: `aapt2 compile --dir app/src/main/res -o /tmp/compiled_res.zip` -- takes ~0.03 seconds
+  - Docker infrastructure: `docker compose up -d postgres redis` -- takes ~7 seconds
 
-- **Available Android SDK Components**:
-  - Build Tools: 34.0.0, 35.0.0, 35.0.1, 36.0.0
-  - Platforms: android-33-ext4, android-33-ext5, android-34, android-34-ext8/10/11/12, android-35, android-35-ext14/15, android-36, android-36-ext18/19
-  - NDK versions: 26.3.11579264, 27.3.13750724, 28.2.13676358
-  - CMake 3.31.5
-  - Platform Tools including ADB
+- **Available Modules and Status**:
+  - **app/**: Android application (Jetpack Compose + Kotlin) - builds with Android SDK
+  - **shared/**: Common utilities and constants - BUILDS SUCCESSFULLY
+  - **backend-core/**: Spring Boot backend service - BUILDS AND RUNS SUCCESSFULLY  
+  - **voice-engine/**: Voice processing service - partial build (depends on shared module Android refs)
+  - **database-layer/**: Database abstraction layer - has dependency resolution issues
+  - **mcp-server/**: Model Context Protocol server - has compilation errors
+  - **integration-hub/**: Cross-app integration - builds with warnings
 
 ## Testing and Validation
 
-- **Unit Testing**: Create JUnit tests in `src/test/java` - can be compiled with `javac` and run offline
-- **Resource Validation**: Always run `aapt2 compile --dir src/main/res -o compiled_res.zip` to validate resources
-- **Device Testing**: Use `adb devices` to check connected devices (will show empty list in development environment)
-- **Manual Validation**: Test basic Android SDK functionality by running resource compilation
+- **Unit Testing**: 
+  - Shared module: `gradle shared:test` -- takes ~3.6 seconds, 5 tests pass
+  - Backend: `gradle backend-core:test` -- takes ~1.6 seconds (cached)
+  - Test infrastructure is working and validated
+- **Resource Validation**: `aapt2 compile --dir app/src/main/res -o /tmp/compiled_res.zip` validates Android resources
+- **Service Validation**: Start backend with `gradle backend-core:bootRun` and verify startup logs
+- **Infrastructure Validation**: Check services with `docker compose ps`
 
-## Environment Limitations
+## Environment Capabilities and Limitations
 
-- **No network access**: Gradle builds requiring remote dependencies will fail
-- **No Android Studio**: Use command-line tools only
-- **No Flutter**: Only native Android development available
-- **No emulator**: Physical device connection required for app testing
+- **Full Docker Infrastructure**: PostgreSQL with pgvector, Redis, Prometheus, Grafana, MinIO, Elasticsearch
+- **Spring Boot Services**: Can build and run backend microservices successfully
+- **Android Development**: Resource compilation works, full APK build requires additional Android configuration
+- **Build System**: Gradle 8.4 works perfectly, Gradle 9.0.0 has compatibility issues
+- **Network Access**: Limited - dependency downloads may fail, use offline-first approaches
+- **Testing**: Unit test infrastructure is working and validated
 
 ## Development Commands
 
-**Basic resource compilation**:
+**Setup Gradle 8.4 (Required)**:
+```bash
+cd /tmp && wget https://services.gradle.org/distributions/gradle-8.4-bin.zip
+unzip -q gradle-8.4-bin.zip
+export GRADLE_HOME=/tmp/gradle-8.4
+export PATH=$GRADLE_HOME/bin:$PATH
+gradle --version
+```
+
+**Start Infrastructure Services (7 seconds)**:
+```bash
+docker compose up -d postgres redis
+docker compose ps
+```
+
+**Build Individual Modules (Recommended)**:
+```bash
+# Shared module (4.5 seconds)
+gradle shared:build -x test
+
+# Backend service (10 seconds)  
+gradle backend-core:build -x test
+
+# Run tests (3.6 seconds)
+gradle shared:test
+```
+
+**Run Backend Service (4 seconds startup)**:
+```bash
+# Start backend (runs on port 8081)
+gradle backend-core:bootRun
+# Verify at http://localhost:8081/actuator/health
+```
+
+**Android Resource Validation (0.03 seconds)**:
 ```bash
 export ANDROID_HOME=/usr/local/lib/android/sdk
-export PATH=$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/build-tools/35.0.0
-aapt2 compile --dir src/main/res -o compiled_res.zip
+export PATH=$PATH:$ANDROID_HOME/build-tools/35.0.0
+aapt2 compile --dir app/src/main/res -o /tmp/compiled_res.zip
 ```
 
-**Check available SDK components**:
+**Docker Infrastructure Management**:
 ```bash
-export ANDROID_HOME=/usr/local/lib/android/sdk
-export PATH=$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin
-sdkmanager --list_installed
-```
+# Check service status
+docker compose ps
 
-**Device management**:
-```bash
-export PATH=$PATH:$ANDROID_HOME/platform-tools
-adb devices
-adb version
-```
+# View logs  
+docker compose logs -f postgres
 
-**Java compilation for Android**:
-```bash
-mkdir -p build/classes
-javac -cp $ANDROID_HOME/platforms/android-35/android.jar -d build/classes src/main/java/**/*.java
+# Stop services (0.5 seconds)
+docker compose down
 ```
-Note: R class generation requires full build process with network dependencies - use resource references cautiously in offline environment.
 
 ## Project Structure
 
-The repository currently contains:
+This is a comprehensive multi-module project:
 ```
 /
-├── README.md
-└── .github/
-    └── copilot-instructions.md
-```
-
-**Expected Android project structure after initialization**:
-```
-/
-├── src/
-│   ├── main/
-│   │   ├── java/com/example/nextgen/
-│   │   ├── res/
-│   │   │   ├── layout/
-│   │   │   ├── values/
-│   │   │   └── drawable/
-│   │   └── AndroidManifest.xml
-│   ├── test/java/
-│   └── androidTest/java/
-├── build.gradle
-├── settings.gradle
-└── README.md
+├── README.md                    # Comprehensive project documentation  
+├── docker-compose.yml           # Full infrastructure stack
+├── build.gradle.kts             # Root build configuration
+├── settings.gradle.kts          # Module configuration  
+├── setup-dev.sh                 # Development setup script (needs docker-compose fix)
+├── app/                         # Android application (Jetpack Compose)
+│   ├── build.gradle.kts         # Android app build configuration
+│   └── src/main/                # Android source code
+├── shared/                      # Common utilities - BUILDS SUCCESSFULLY
+│   ├── src/main/kotlin/         # Shared data models and constants  
+│   └── src/test/kotlin/         # Unit tests (5 tests pass)
+├── backend-core/                # Spring Boot backend - BUILDS AND RUNS
+│   ├── src/main/kotlin/         # REST APIs, WebSocket, database integration
+│   └── src/main/resources/      # Application configuration
+├── voice-engine/                # Voice command processing
+├── database-layer/              # PostgreSQL with pgvector integration  
+├── mcp-server/                  # Model Context Protocol server
+├── integration-hub/             # Cross-application integration
+└── docker/                     # Docker configuration and scripts
 ```
 
 ## Common Tasks
 
-**Initialize Android project**:
-1. Create project structure: `mkdir -p src/main/java/com/example/nextgen src/main/res/layout src/main/res/values`
-2. Create basic `build.gradle` with buildscript dependencies (note: will fail to build due to network restrictions)
-3. Create `AndroidManifest.xml`
-4. Create initial Activity and layout files
-5. Test resource compilation with `aapt2`
+**Initialize Development Environment**:
+1. Download Gradle 8.4: `wget https://services.gradle.org/distributions/gradle-8.4-bin.zip`
+2. Extract and set PATH: `export GRADLE_HOME=/tmp/gradle-8.4 && export PATH=$GRADLE_HOME/bin:$PATH`
+3. Start infrastructure: `docker compose up -d postgres redis` (7 seconds)
+4. Build shared module: `gradle shared:build -x test` (4.5 seconds)
+5. Test backend: `gradle backend-core:bootRun` (starts in 4 seconds)
 
-**Validate changes**:
-1. Always run resource compilation after modifying resources
-2. Compile Java sources against Android platform JAR
-3. Check project structure matches Android conventions
-4. Verify AndroidManifest.xml syntax
+**Validate Changes**:
+1. Always build individual modules rather than full project build
+2. Test shared module: `gradle shared:test` (3.6 seconds, 5 tests)
+3. Validate Android resources: `aapt2 compile --dir app/src/main/res -o /tmp/compiled_res.zip` (0.03 seconds)
+4. Check Docker services: `docker compose ps`
+5. Verify backend health: visit http://localhost:8081/actuator/health
+
+**Build and Test Individual Modules**:
+- Shared: `gradle shared:build shared:test` 
+- Backend: `gradle backend-core:build backend-core:test`
+- Android resources: `aapt2 compile --dir app/src/main/res -o /tmp/compiled_res.zip`
 
 ## Important Notes
 
-- **NEVER CANCEL**: All builds and compilations should be allowed to complete - set timeouts to 10+ minutes minimum
-- **Offline Development**: This environment is designed for offline Android development using pre-installed SDK tools
-- **Manual Build Process**: Due to network restrictions, use manual compilation steps rather than full Gradle builds
-- **Resource Focus**: Emphasis should be on resource management, layout design, and core Android application structure
-- **Testing Approach**: Focus on resource validation and basic compilation rather than runtime testing
+- **NEVER CANCEL**: All commands complete quickly. Max timeout needed is 120 seconds for initial setup.
+- **Use Individual Module Builds**: Full project build fails due to compilation errors in some modules
+- **Gradle 8.4 Required**: System Gradle 9.0.0 has compatibility issues with the build scripts
+- **Infrastructure Works**: PostgreSQL, Redis, and full Docker stack operational  
+- **Spring Boot Services**: Backend services build and run successfully with database connectivity
+- **Android Development**: Resource compilation works, full Android builds may need additional configuration
+- **Testing Validated**: Unit test infrastructure is working with 5 passing tests in shared module
+
+## Measured Timing Results
+
+| Task | Time | Status |
+|------|------|---------|
+| Download Gradle 8.4 | 1-2 seconds | ✅ Working |
+| Docker infrastructure startup | ~7 seconds | ✅ Working |
+| Project configuration (gradle tasks) | ~52 seconds | ✅ Working |
+| Shared module build | ~4.5 seconds | ✅ Working |
+| Backend-core build | ~10 seconds | ✅ Working |
+| Backend service startup | ~4 seconds | ✅ Working |
+| Shared module tests | ~3.6 seconds | ✅ Working (5 tests pass) |
+| Android resource compilation | ~0.03 seconds | ✅ Working |
+| Docker services shutdown | ~0.5 seconds | ✅ Working |
+
+## Validation Scenarios
+
+After making changes, always run these validation steps:
+
+1. **Basic Module Build**: `gradle shared:build -x test` - should complete in ~4.5 seconds
+2. **Test Execution**: `gradle shared:test` - should pass 5 tests in ~3.6 seconds  
+3. **Backend Service**: `gradle backend-core:bootRun` - should start in ~4 seconds with PostgreSQL connection
+4. **Infrastructure Health**: `docker compose ps` - should show postgres and redis running
+5. **Android Resources**: `aapt2 compile --dir app/src/main/res -o /tmp/compiled_res.zip` - should complete in ~0.03 seconds
 
 ## Frequently Used Command Outputs
 
-### Repository Root Contents
+### Project Structure
 ```bash
 $ ls -la /home/runner/work/nextgen_apk/nextgen_apk
-total 16
-drwxr-xr-x 3 runner runner 4096 Sep 11 14:34 .
-drwxr-xr-x 3 runner runner 4096 Sep 11 14:34 ..
-drwxrwxr-x 7 runner runner 4096 Sep 11 14:34 .git
--rw-rw-r-- 1 runner runner   26 Sep 11 14:34 README.md
+total 100
+drwxr-xr-x 13 runner runner  4096 Sep 13 12:39 .
+-rw-rw-r--  1 runner runner 12206 Sep 13 12:39 README.md
+drwxrwxr-x  3 runner runner  4096 Sep 13 12:39 app
+drwxrwxr-x  3 runner runner  4096 Sep 13 12:39 backend-core
+-rw-rw-r--  1 runner runner   857 Sep 13 12:39 build.gradle.kts
+drwxrwxr-x  3 runner runner  4096 Sep 13 12:39 database-layer
+-rw-rw-r--  1 runner runner  4228 Sep 13 12:39 docker-compose.yml
+-rwxrwxr-x  1 runner runner  4974 Sep 13 12:39 gradlew
+drwxrwxr-x  3 runner runner  4096 Sep 13 12:39 integration-hub
+drwxrwxr-x  3 runner runner  4096 Sep 13 12:39 mcp-server
+-rwxrwxr-x  1 runner runner  3230 Sep 13 12:39 setup-dev.sh
+drwxrwxr-x  3 runner runner  4096 Sep 13 12:39 shared  
+drwxrwxr-x  3 runner runner  4096 Sep 13 12:39 voice-engine
 ```
 
-### Android SDK Structure
+### Docker Services Status
 ```bash
-$ ls -la $ANDROID_HOME
-build-tools/  cmake/  cmdline-tools/  extras/  licenses/  ndk/  platform-tools/  platforms/
+$ docker compose ps
+NAME               IMAGE                    COMMAND                  SERVICE    CREATED         STATUS                   PORTS
+nextgen-postgres   pgvector/pgvector:pg15   "docker-entrypoint.s…"   postgres   7 seconds ago   Up 5 seconds (healthy)   0.0.0.0:5432->5432/tcp
+nextgen-redis      redis:7-alpine           "docker-entrypoint.s…"   redis      7 seconds ago   Up 7 seconds             0.0.0.0:6379->6379/tcp
 ```
 
-### Available Build Tools
-```bash
-$ ls $ANDROID_HOME/build-tools/
-34.0.0  35.0.0  35.0.1  36.0.0
-```
+### Available Gradle Tasks
+- `backend-core:bootRun` - Run Spring Boot backend service
+- `mcp-server:bootRun` - Run MCP server service  
+- `shared:build` - Build shared utilities module
+- `shared:test` - Run shared module tests
+- `backend-core:build` - Build backend service
+- Android resource compilation with `aapt2`

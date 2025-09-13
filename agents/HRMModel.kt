@@ -5,8 +5,10 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
 /**
- * HRMModel - Human Resource Management Model
- * Responsible for human-AI interaction, talent management, and human capability optimization
+ * HRMModel - Central Reasoning Brain and Language Model
+ * Core on-device AI brain responsible for reasoning, logic, and human-like cognitive architecture.
+ * All agents report to HRM for logical decisions. Interfaces with cloud LLM for data resourcing.
+ * Small enough to live on-device locally with human-like cognitive capabilities.
  */
 class HRMModel(
     override val id: String = "hrm-001",
@@ -17,6 +19,20 @@ class HRMModel(
     override var state = AgentState.IDLE
         private set
     
+    // Central Brain Components
+    private val cognitiveCore = CognitiveCore()
+    private val reasoningEngine = ReasoningEngine()
+    private val memorySystem = MemorySystem()
+    private val learningModule = LearningModule()
+    private val cloudLLMConnector = CloudLLMConnector()
+    
+    // Agent Management and Logic
+    private val agentLogicRegistry = mutableMapOf<String, AgentLogic>()
+    private val departmentManagers = mutableMapOf<String, DepartmentAgent>()
+    private val activeDecisions = mutableMapOf<String, Decision>()
+    private val cognitiveTasks = mutableListOf<CognitiveTask>()
+    
+    // Human Resource Management (Secondary Role)
     private val humanProfiles = mutableMapOf<String, HumanProfile>()
     private val skillAssessments = mutableMapOf<String, SkillAssessment>()
     private val performanceMetrics = mutableMapOf<String, PerformanceRecord>()
@@ -25,6 +41,278 @@ class HRMModel(
     
     private var isActive = false
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    
+    // ========== COGNITIVE ARCHITECTURE COMPONENTS ==========
+    
+    data class CognitiveCore(
+        val workingMemory: MutableMap<String, Any> = mutableMapOf(),
+        val attentionFocus: MutableSet<String> = mutableSetOf(),
+        val contextualAwareness: MutableMap<String, Float> = mutableMapOf(),
+        val cognitiveLoad: Float = 0f,
+        val processingQueue: MutableList<CognitiveTask> = mutableListOf()
+    )
+    
+    data class ReasoningEngine(
+        val logicalRules: MutableMap<String, LogicalRule> = mutableMapOf(),
+        val inferenceChains: MutableList<InferenceChain> = mutableListOf(),
+        val decisionTrees: MutableMap<String, DecisionTree> = mutableMapOf(),
+        val analogyDatabase: MutableMap<String, Analogy> = mutableMapOf(),
+        val reasoningHistory: MutableList<ReasoningStep> = mutableListOf()
+    )
+    
+    data class MemorySystem(
+        val shortTermMemory: MutableMap<String, MemoryItem> = mutableMapOf(),
+        val longTermMemory: MutableMap<String, MemoryItem> = mutableMapOf(),
+        val episodicMemory: MutableList<Episode> = mutableListOf(),
+        val proceduralMemory: MutableMap<String, Procedure> = mutableMapOf(),
+        val semanticNetwork: MutableMap<String, Set<String>> = mutableMapOf()
+    )
+    
+    data class LearningModule(
+        val learningRate: Float = 0.1f,
+        val adaptationMechanisms: MutableMap<String, AdaptationMechanism> = mutableMapOf(),
+        val experienceBuffer: MutableList<Experience> = mutableListOf(),
+        val skillAcquisition: MutableMap<String, SkillProgress> = mutableMapOf(),
+        val reinforcementHistory: MutableList<ReinforcementEvent> = mutableListOf()
+    )
+    
+    data class CloudLLMConnector(
+        val apiEndpoints: MutableMap<String, ApiEndpoint> = mutableMapOf(),
+        val requestCache: MutableMap<String, CachedResponse> = mutableMapOf(),
+        val connectionStatus: ConnectionStatus = ConnectionStatus.DISCONNECTED,
+        val rateLimiters: MutableMap<String, RateLimiter> = mutableMapOf(),
+        val errorHistory: MutableList<ApiError> = mutableListOf()
+    )
+    
+    data class CognitiveTask(
+        val id: String,
+        val type: TaskType,
+        val priority: Priority,
+        val complexity: Float,
+        val estimatedDuration: Long,
+        val dependencies: List<String>,
+        val context: Map<String, Any>,
+        val status: TaskStatus = TaskStatus.PENDING
+    )
+    
+    data class LogicalRule(
+        val id: String,
+        val condition: String,
+        val action: String,
+        val confidence: Float,
+        val usageCount: Int = 0,
+        val successRate: Float = 0f
+    )
+    
+    data class InferenceChain(
+        val premises: List<String>,
+        val conclusion: String,
+        val confidence: Float,
+        val reasoning: String
+    )
+    
+    data class DecisionTree(
+        val rootNode: DecisionNode,
+        val accuracy: Float,
+        val trainingData: List<DecisionExample>
+    )
+    
+    data class DecisionNode(
+        val condition: String,
+        val trueChild: DecisionNode?,
+        val falseChild: DecisionNode?,
+        val action: String?,
+        val confidence: Float
+    )
+    
+    data class DecisionExample(
+        val inputs: Map<String, Any>,
+        val expectedOutput: String,
+        val actualOutput: String?
+    )
+    
+    data class Analogy(
+        val sourceContext: String,
+        val targetContext: String,
+        val mappings: Map<String, String>,
+        val confidence: Float
+    )
+    
+    data class ReasoningStep(
+        val stepId: String,
+        val type: ReasoningType,
+        val input: String,
+        val output: String,
+        val confidence: Float,
+        val timestamp: Long = System.currentTimeMillis()
+    )
+    
+    enum class ReasoningType {
+        DEDUCTIVE, INDUCTIVE, ABDUCTIVE, ANALOGICAL, CAUSAL, PROBABILISTIC
+    }
+    
+    data class MemoryItem(
+        val content: Any,
+        val importance: Float,
+        val accessibility: Float,
+        val lastAccessed: Long,
+        val associatedConcepts: Set<String>
+    )
+    
+    data class Episode(
+        val id: String,
+        val context: String,
+        val events: List<String>,
+        val outcome: String,
+        val emotions: Map<String, Float>,
+        val timestamp: Long = System.currentTimeMillis()
+    )
+    
+    data class Procedure(
+        val steps: List<String>,
+        val conditions: List<String>,
+        val successRate: Float,
+        val averageTime: Long
+    )
+    
+    data class AdaptationMechanism(
+        val triggerConditions: List<String>,
+        val adaptationActions: List<String>,
+        val effectivenesMetrics: Map<String, Float>
+    )
+    
+    data class Experience(
+        val context: String,
+        val action: String,
+        val outcome: String,
+        val reward: Float,
+        val timestamp: Long = System.currentTimeMillis()
+    )
+    
+    data class SkillProgress(
+        val currentLevel: Float,
+        val targetLevel: Float,
+        val learningVelocity: Float,
+        val practiceHours: Float,
+        val milestones: List<String>
+    )
+    
+    data class ReinforcementEvent(
+        val action: String,
+        val context: String,
+        val reward: Float,
+        val humanFeedback: String?,
+        val validated: Boolean = false
+    )
+    
+    data class ApiEndpoint(
+        val url: String,
+        val apiKey: String,
+        val maxRequestsPerMinute: Int,
+        val timeout: Long,
+        val retryCount: Int
+    )
+    
+    data class CachedResponse(
+        val query: String,
+        val response: String,
+        val timestamp: Long,
+        val expiryTime: Long
+    )
+    
+    data class RateLimiter(
+        val requestsRemaining: Int,
+        val resetTime: Long,
+        val windowStart: Long
+    )
+    
+    data class ApiError(
+        val endpoint: String,
+        val errorCode: String,
+        val errorMessage: String,
+        val timestamp: Long = System.currentTimeMillis()
+    )
+    
+    enum class ConnectionStatus {
+        CONNECTED, DISCONNECTED, CONNECTING, ERROR, RATE_LIMITED
+    }
+    
+    enum class TaskType {
+        REASONING, LEARNING, MEMORY_RETRIEVAL, DECISION_MAKING, PATTERN_RECOGNITION,
+        LANGUAGE_PROCESSING, PROBLEM_SOLVING, CREATIVE_THINKING, KNOWLEDGE_INTEGRATION
+    }
+    
+    enum class TaskStatus {
+        PENDING, IN_PROGRESS, COMPLETED, FAILED, CANCELLED
+    }
+    
+    // Agent Logic and Department Management
+    data class AgentLogic(
+        val agentId: String,
+        val department: String,
+        val domainKnowledge: Map<String, Float>,
+        val behaviorPatterns: List<BehaviorPattern>,
+        val performanceMetrics: AgentPerformanceMetrics,
+        val selfImprovementGoals: List<String>
+    )
+    
+    data class DepartmentAgent(
+        val id: String,
+        val department: Department,
+        val specializations: List<String>,
+        val autonomyLevel: Float,
+        val currentTasks: MutableList<String>,
+        val workflowOptimizations: MutableMap<String, Float>,
+        val humanInLoopRequired: Boolean = true
+    )
+    
+    data class BehaviorPattern(
+        val trigger: String,
+        val response: String,
+        val confidence: Float,
+        val validationRequired: Boolean
+    )
+    
+    data class AgentPerformanceMetrics(
+        val taskCompletionRate: Float,
+        val accuracyScore: Float,
+        val efficiency: Float,
+        val userSatisfaction: Float,
+        val selfImprovementRate: Float
+    )
+    
+    data class Decision(
+        val id: String,
+        val context: String,
+        val options: List<DecisionOption>,
+        val selectedOption: String?,
+        val reasoning: String,
+        val confidence: Float,
+        val humanApprovalRequired: Boolean,
+        val outcome: DecisionOutcome?
+    )
+    
+    data class DecisionOption(
+        val id: String,
+        val description: String,
+        val expectedOutcome: String,
+        val risk: Float,
+        val benefit: Float
+    )
+    
+    data class DecisionOutcome(
+        val actualResult: String,
+        val satisfaction: Float,
+        val lessonLearned: String
+    )
+    
+    enum class Department {
+        SCHEDULING, CALL_HANDLING, LOCATION_TRACKING, NOTE_TAKING, 
+        DATA_STORAGE, CRM, ACCOUNTING, FINANCIAL_REPORTS, COMMUNICATIONS, 
+        RESOURCE_MANAGEMENT, QUALITY_ASSURANCE, AUTOMATION
+    }
+    
+    // ========== EXISTING HR DATA STRUCTURES ==========
     
     data class HumanProfile(
         val id: String,
@@ -218,6 +506,357 @@ class HRMModel(
                 learnHRTechnique(event.data)
             }
         }
+    }
+    
+    // ========== CENTRAL BRAIN COGNITIVE PROCESSING ==========
+    
+    /**
+     * Central reasoning method - all agents report here for logical decisions
+     */
+    suspend fun processLogicalDecision(agentId: String, context: String, options: List<DecisionOption>): Decision {
+        val cognitiveTask = CognitiveTask(
+            id = "decision-${System.currentTimeMillis()}",
+            type = TaskType.DECISION_MAKING,
+            priority = Priority.HIGH,
+            complexity = calculateComplexity(options),
+            estimatedDuration = estimateDecisionTime(options),
+            dependencies = emptyList(),
+            context = mapOf("agent" to agentId, "context" to context)
+        )
+        
+        // Add to cognitive processing queue
+        cognitiveCore.processingQueue.add(cognitiveTask)
+        
+        // Reason through the options
+        val reasoning = reasoningEngine.processDecision(context, options)
+        val selectedOption = selectBestOption(options, reasoning)
+        
+        val decision = Decision(
+            id = cognitiveTask.id,
+            context = context,
+            options = options,
+            selectedOption = selectedOption,
+            reasoning = reasoning.explanation,
+            confidence = reasoning.confidence,
+            humanApprovalRequired = reasoning.confidence < 0.8f,
+            outcome = null
+        )
+        
+        activeDecisions[decision.id] = decision
+        
+        // Store in memory for future learning
+        memorySystem.storeDecisionEpisode(decision)
+        
+        return decision
+    }
+    
+    /**
+     * Query cloud LLM for advanced reasoning and data resourcing
+     */
+    suspend fun queryCloudLLM(query: String, context: Map<String, Any>): String {
+        // Check cache first
+        val cacheKey = generateCacheKey(query, context)
+        cloudLLMConnector.requestCache[cacheKey]?.let { cached ->
+            if (cached.timestamp + cached.expiryTime > System.currentTimeMillis()) {
+                return cached.response
+            }
+        }
+        
+        // Check rate limits
+        if (!checkRateLimit("primary")) {
+            return fallbackReasoning(query, context)
+        }
+        
+        return try {
+            val response = makeCloudLLMRequest(query, context)
+            
+            // Cache the response
+            cloudLLMConnector.requestCache[cacheKey] = CachedResponse(
+                query = query,
+                response = response,
+                timestamp = System.currentTimeMillis(),
+                expiryTime = 3600000 // 1 hour
+            )
+            
+            response
+        } catch (e: Exception) {
+            cloudLLMConnector.errorHistory.add(
+                ApiError("primary", "REQUEST_FAILED", e.message ?: "Unknown error")
+            )
+            fallbackReasoning(query, context)
+        }
+    }
+    
+    /**
+     * Provide logical guidance to department agents
+     */
+    suspend fun provideAgentGuidance(agentId: String, department: Department, task: String): AgentLogic {
+        val existingLogic = agentLogicRegistry[agentId]
+        val domainKnowledge = getDomainKnowledge(department)
+        
+        val guidance = AgentLogic(
+            agentId = agentId,
+            department = department.name,
+            domainKnowledge = domainKnowledge,
+            behaviorPatterns = generateBehaviorPatterns(department, task),
+            performanceMetrics = existingLogic?.performanceMetrics ?: createDefaultMetrics(),
+            selfImprovementGoals = generateImprovementGoals(agentId, department)
+        )
+        
+        agentLogicRegistry[agentId] = guidance
+        return guidance
+    }
+    
+    /**
+     * Learn from agent feedback and improve decision making
+     */
+    suspend fun learnFromAgentFeedback(agentId: String, decisionId: String, outcome: DecisionOutcome) {
+        activeDecisions[decisionId]?.let { decision ->
+            val updatedDecision = decision.copy(outcome = outcome)
+            activeDecisions[decisionId] = updatedDecision
+            
+            // Update reasoning engine based on outcome
+            val reinforcement = ReinforcementEvent(
+                action = decision.selectedOption ?: "",
+                context = decision.context,
+                reward = outcome.satisfaction,
+                humanFeedback = outcome.lessonLearned,
+                validated = outcome.satisfaction > 0.7f
+            )
+            
+            learningModule.reinforcementHistory.add(reinforcement)
+            
+            // Improve decision patterns for future similar contexts
+            if (reinforcement.validated) {
+                improveDecisionPattern(decision.context, decision.selectedOption ?: "", outcome.satisfaction)
+            }
+        }
+    }
+    
+    /**
+     * Manage department agents and assign roles
+     */
+    suspend fun manageDepartmentAgent(department: Department, workload: String): DepartmentAgent {
+        val agentId = "dept-${department.name.lowercase()}-${System.currentTimeMillis()}"
+        
+        val departmentAgent = DepartmentAgent(
+            id = agentId,
+            department = department,
+            specializations = getDepartmentSpecializations(department),
+            autonomyLevel = calculateAutonomyLevel(department, workload),
+            currentTasks = mutableListOf(workload),
+            workflowOptimizations = mutableMapOf(),
+            humanInLoopRequired = requiresHumanOversight(department, workload)
+        )
+        
+        departmentManagers[agentId] = departmentAgent
+        
+        // Provide initial guidance
+        provideAgentGuidance(agentId, department, workload)
+        
+        return departmentAgent
+    }
+    
+    // ========== COGNITIVE ARCHITECTURE HELPER METHODS ==========
+    
+    private fun ReasoningEngine.processDecision(context: String, options: List<DecisionOption>): ReasoningResult {
+        // Apply logical rules and inference chains
+        val applicableRules = logicalRules.values.filter { rule ->
+            rule.condition in context
+        }
+        
+        val bestOption = options.maxByOrNull { option ->
+            calculateOptionScore(option, applicableRules)
+        }
+        
+        val confidence = if (applicableRules.isNotEmpty()) {
+            applicableRules.map { it.confidence }.average().toFloat()
+        } else {
+            0.5f // Default confidence when no rules apply
+        }
+        
+        return ReasoningResult(
+            explanation = "Selected based on logical rules and expected outcomes",
+            confidence = confidence,
+            recommendedOption = bestOption?.id ?: options.first().id
+        )
+    }
+    
+    private data class ReasoningResult(
+        val explanation: String,
+        val confidence: Float,
+        val recommendedOption: String
+    )
+    
+    private fun calculateComplexity(options: List<DecisionOption>): Float {
+        return (options.size * 0.1f + options.sumOf { it.risk + it.benefit }.toFloat() / options.size).coerceAtMost(1f)
+    }
+    
+    private fun estimateDecisionTime(options: List<DecisionOption>): Long {
+        return (1000 + options.size * 500).toLong() // Base time + complexity
+    }
+    
+    private fun calculateOptionScore(option: DecisionOption, rules: List<LogicalRule>): Float {
+        val baseScore = option.benefit - option.risk
+        val ruleBonus = rules.filter { rule ->
+            rule.action in option.description
+        }.sumOf { it.confidence } / 10f
+        
+        return baseScore + ruleBonus
+    }
+    
+    private fun selectBestOption(options: List<DecisionOption>, reasoning: ReasoningResult): String {
+        return reasoning.recommendedOption
+    }
+    
+    private fun MemorySystem.storeDecisionEpisode(decision: Decision) {
+        val episode = Episode(
+            id = decision.id,
+            context = decision.context,
+            events = listOf("Decision made: ${decision.selectedOption}"),
+            outcome = decision.reasoning,
+            emotions = mapOf("confidence" to decision.confidence)
+        )
+        episodicMemory.add(episode)
+        
+        // Limit memory size
+        if (episodicMemory.size > 1000) {
+            episodicMemory.removeAt(0)
+        }
+    }
+    
+    private fun generateCacheKey(query: String, context: Map<String, Any>): String {
+        return "${query.hashCode()}-${context.hashCode()}"
+    }
+    
+    private fun checkRateLimit(endpoint: String): Boolean {
+        val limiter = cloudLLMConnector.rateLimiters[endpoint] ?: return true
+        return limiter.requestsRemaining > 0 && System.currentTimeMillis() < limiter.resetTime
+    }
+    
+    private suspend fun makeCloudLLMRequest(query: String, context: Map<String, Any>): String {
+        // Simulate cloud LLM API call
+        delay(200) // Simulate network delay
+        return "Cloud LLM Response: Processed query '$query' with context ${context.keys.joinToString()}"
+    }
+    
+    private fun fallbackReasoning(query: String, context: Map<String, Any>): String {
+        return "Local reasoning fallback: $query"
+    }
+    
+    private fun getDomainKnowledge(department: Department): Map<String, Float> {
+        return when (department) {
+            Department.SCHEDULING -> mapOf(
+                "time_management" to 0.9f,
+                "calendar_optimization" to 0.8f,
+                "conflict_resolution" to 0.7f
+            )
+            Department.CALL_HANDLING -> mapOf(
+                "communication" to 0.9f,
+                "customer_service" to 0.8f,
+                "problem_solving" to 0.7f
+            )
+            Department.CRM -> mapOf(
+                "data_management" to 0.9f,
+                "relationship_building" to 0.8f,
+                "analytics" to 0.7f
+            )
+            else -> mapOf("general_knowledge" to 0.6f)
+        }
+    }
+    
+    private fun generateBehaviorPatterns(department: Department, task: String): List<BehaviorPattern> {
+        return when (department) {
+            Department.SCHEDULING -> listOf(
+                BehaviorPattern("time_conflict", "suggest_alternative", 0.8f, false),
+                BehaviorPattern("urgent_request", "prioritize_scheduling", 0.9f, true)
+            )
+            Department.CALL_HANDLING -> listOf(
+                BehaviorPattern("angry_caller", "de_escalate", 0.7f, true),
+                BehaviorPattern("technical_issue", "route_to_expert", 0.8f, false)
+            )
+            else -> listOf(
+                BehaviorPattern("unknown_situation", "request_guidance", 0.6f, true)
+            )
+        }
+    }
+    
+    private fun createDefaultMetrics(): AgentPerformanceMetrics {
+        return AgentPerformanceMetrics(
+            taskCompletionRate = 0.8f,
+            accuracyScore = 0.75f,
+            efficiency = 0.7f,
+            userSatisfaction = 0.8f,
+            selfImprovementRate = 0.1f
+        )
+    }
+    
+    private fun generateImprovementGoals(agentId: String, department: Department): List<String> {
+        return when (department) {
+            Department.SCHEDULING -> listOf(
+                "Reduce scheduling conflicts by 20%",
+                "Improve response time by 15%",
+                "Learn advanced calendar optimization"
+            )
+            Department.CALL_HANDLING -> listOf(
+                "Increase first-call resolution rate",
+                "Improve customer satisfaction scores",
+                "Master advanced communication techniques"
+            )
+            else -> listOf(
+                "Improve task accuracy",
+                "Increase efficiency",
+                "Learn domain-specific skills"
+            )
+        }
+    }
+    
+    private fun getDepartmentSpecializations(department: Department): List<String> {
+        return when (department) {
+            Department.SCHEDULING -> listOf("Calendar Management", "Time Optimization", "Conflict Resolution")
+            Department.CALL_HANDLING -> listOf("Communication", "Customer Service", "Issue Resolution")
+            Department.LOCATION_TRACKING -> listOf("GPS Tracking", "Route Optimization", "Location Analysis")
+            Department.NOTE_TAKING -> listOf("Information Extraction", "Summarization", "Organization")
+            Department.DATA_STORAGE -> listOf("Database Management", "Data Security", "Backup Systems")
+            Department.CRM -> listOf("Customer Relations", "Data Analysis", "Pipeline Management")
+            Department.ACCOUNTING -> listOf("Financial Analysis", "Reporting", "Compliance")
+            Department.FINANCIAL_REPORTS -> listOf("Report Generation", "Data Visualization", "Analysis")
+            else -> listOf("General Operations")
+        }
+    }
+    
+    private fun calculateAutonomyLevel(department: Department, workload: String): Float {
+        val baseAutonomy = when (department) {
+            Department.DATA_STORAGE, Department.NOTE_TAKING -> 0.9f // High autonomy for routine tasks
+            Department.ACCOUNTING, Department.FINANCIAL_REPORTS -> 0.6f // Medium autonomy, needs oversight
+            Department.CALL_HANDLING, Department.CRM -> 0.7f // Medium-high autonomy
+            else -> 0.8f
+        }
+        
+        // Adjust based on workload complexity
+        val complexityFactor = if ("complex" in workload.lowercase()) 0.8f else 1f
+        return (baseAutonomy * complexityFactor).coerceIn(0.1f, 0.95f)
+    }
+    
+    private fun requiresHumanOversight(department: Department, workload: String): Boolean {
+        return when (department) {
+            Department.ACCOUNTING, Department.FINANCIAL_REPORTS -> true // Always require human oversight for financial matters
+            Department.CALL_HANDLING -> "escalation" in workload.lowercase()
+            else -> "critical" in workload.lowercase() || "sensitive" in workload.lowercase()
+        }
+    }
+    
+    private fun improveDecisionPattern(context: String, selectedOption: String, satisfaction: Float) {
+        val rule = LogicalRule(
+            id = "rule-${System.currentTimeMillis()}",
+            condition = context,
+            action = selectedOption,
+            confidence = satisfaction,
+            usageCount = 1,
+            successRate = satisfaction
+        )
+        
+        reasoningEngine.logicalRules[rule.id] = rule
     }
     
     override fun getCapabilities(): List<String> {

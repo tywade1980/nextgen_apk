@@ -5,8 +5,10 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
 /**
- * HermesBrain - Advanced Communication and Translation Agent
- * Responsible for inter-agent communication, language processing, and protocol translation
+ * HermesBrain - Safety-Focused Mouthpiece and Output Filter
+ * Responsible for guardrails, safety protocols, flexibility, steerability, and alignment.
+ * Acts as the personality interface with advanced output filtering replacing HRM's output filtering.
+ * Ensures all communications are safe, appropriate, and aligned with user values.
  */
 class HermesBrain(
     override val id: String = "hermes-001",
@@ -17,13 +19,173 @@ class HermesBrain(
     override var state = AgentState.IDLE
         private set
     
+    // Safety and Guardrail Systems
+    private val safetyFilters = mutableMapOf<String, SafetyFilter>()
+    private val guardrailPolicies = mutableMapOf<String, GuardrailPolicy>()
+    private val alignmentCheckers = mutableMapOf<String, AlignmentChecker>()
+    private val outputFilters = mutableMapOf<String, OutputFilter>()
+    private val personalityModel = PersonalityModel()
+    
+    // Communication and Translation (Secondary Role)
     private val communicationChannels = mutableMapOf<String, CommunicationChannel>()
     private val messageQueue = mutableListOf<QueuedMessage>()
     private val translationCache = mutableMapOf<String, TranslationEntry>()
     private val protocolHandlers = mutableMapOf<CommunicationProtocol, ProtocolHandler>()
     
+    // Safety Monitoring
+    private val safetyViolations = mutableListOf<SafetyViolation>()
+    private val riskAssessments = mutableMapOf<String, RiskAssessment>()
+    private val approvalQueue = mutableListOf<PendingApproval>()
+    
     private var isActive = false
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    
+    // ========== SAFETY AND GUARDRAIL DATA STRUCTURES ==========
+    
+    data class SafetyFilter(
+        val id: String,
+        val type: SafetyFilterType,
+        val patterns: List<String>,
+        val action: FilterAction,
+        val severity: RiskLevel,
+        val enabled: Boolean = true
+    )
+    
+    data class GuardrailPolicy(
+        val id: String,
+        val domain: String,
+        val rules: List<PolicyRule>,
+        val enforcement: EnforcementLevel,
+        val exceptions: List<String>
+    )
+    
+    data class AlignmentChecker(
+        val id: String,
+        val valueSystem: Map<String, Float>,
+        val checkpoints: List<AlignmentCheckpoint>,
+        val threshold: Float
+    )
+    
+    data class OutputFilter(
+        val id: String,
+        val filterType: FilterType,
+        val criteria: FilterCriteria,
+        val transformations: List<Transformation>,
+        val priority: Int
+    )
+    
+    data class PersonalityModel(
+        val traits: Map<String, Float> = mapOf(
+            "helpfulness" to 0.9f,
+            "harmlessness" to 0.95f,
+            "honesty" to 0.9f,
+            "politeness" to 0.8f,
+            "empathy" to 0.7f,
+            "assertiveness" to 0.6f
+        ),
+        val communicationStyle: CommunicationStyle = CommunicationStyle.PROFESSIONAL,
+        val adaptability: Float = 0.8f,
+        val contextualAwareness: Float = 0.9f
+    )
+    
+    data class SafetyViolation(
+        val id: String,
+        val type: ViolationType,
+        val severity: RiskLevel,
+        val description: String,
+        val originalContent: String,
+        val triggeredFilters: List<String>,
+        val action: ResponseAction,
+        val timestamp: Long = System.currentTimeMillis()
+    )
+    
+    data class RiskAssessment(
+        val contentId: String,
+        val riskLevel: RiskLevel,
+        val riskFactors: List<String>,
+        val mitigations: List<String>,
+        val confidence: Float,
+        val recommendedAction: ResponseAction
+    )
+    
+    data class PendingApproval(
+        val id: String,
+        val content: String,
+        val riskLevel: RiskLevel,
+        val requestingAgent: AgentType,
+        val justification: String,
+        val timeout: Long,
+        val priority: Priority
+    )
+    
+    data class PolicyRule(
+        val condition: String,
+        val action: String,
+        val severity: RiskLevel,
+        val exemptions: List<String>
+    )
+    
+    data class AlignmentCheckpoint(
+        val aspect: String,
+        val weight: Float,
+        val criteria: String,
+        val threshold: Float
+    )
+    
+    data class FilterCriteria(
+        val keywords: List<String>,
+        val patterns: List<String>,
+        val contextualFactors: List<String>,
+        val exclusions: List<String>
+    )
+    
+    data class Transformation(
+        val type: TransformationType,
+        val parameters: Map<String, Any>,
+        val condition: String?
+    )
+    
+    enum class SafetyFilterType {
+        PROFANITY, HARMFUL_CONTENT, PRIVACY_VIOLATION, MISINFORMATION, 
+        BIAS_DETECTION, INAPPROPRIATE_REQUESTS, SECURITY_RISK
+    }
+    
+    enum class FilterAction {
+        BLOCK, WARN, MODIFY, ESCALATE, LOG_ONLY
+    }
+    
+    enum class RiskLevel {
+        NONE, LOW, MEDIUM, HIGH, CRITICAL
+    }
+    
+    enum class EnforcementLevel {
+        ADVISORY, STRICT, ABSOLUTE
+    }
+    
+    enum class FilterType {
+        CONTENT_SAFETY, TONE_ADJUSTMENT, ACCURACY_CHECK, PRIVACY_PROTECTION, 
+        APPROPRIATENESS, ALIGNMENT_VERIFICATION
+    }
+    
+    enum class CommunicationStyle {
+        PROFESSIONAL, CASUAL, EMPATHETIC, ASSERTIVE, TECHNICAL, EDUCATIONAL
+    }
+    
+    enum class ViolationType {
+        SAFETY_VIOLATION, POLICY_BREACH, ALIGNMENT_MISMATCH, INAPPROPRIATE_CONTENT,
+        PRIVACY_LEAK, HARMFUL_INSTRUCTION, BIASED_OUTPUT
+    }
+    
+    enum class ResponseAction {
+        ALLOW, BLOCK, MODIFY, REQUEST_HUMAN_REVIEW, ESCALATE, DENY_AND_EXPLAIN
+    }
+    
+    enum class TransformationType {
+        TONE_ADJUSTMENT, CONTENT_SANITIZATION, CLARIFICATION_ADDITION, 
+        WARNING_INSERTION, REPHRASING, CONTEXT_ENHANCEMENT
+    }
+    
+    // ========== EXISTING COMMUNICATION DATA STRUCTURES ==========
     
     data class CommunicationChannel(
         val id: String,
@@ -84,14 +246,27 @@ class HermesBrain(
         state = AgentState.COMMUNICATING
         
         return try {
-            when (message.content) {
-                "ESTABLISH_CHANNEL" -> establishChannel(message)
-                "TRANSLATE_MESSAGE" -> translateMessage(message)
-                "BROADCAST_MESSAGE" -> broadcastMessage(message)
-                "ROUTE_MESSAGE" -> routeMessage(message)
-                "CHANNEL_STATUS" -> getChannelStatus(message)
-                "OPTIMIZE_COMMUNICATION" -> optimizeCommunication(message)
-                else -> relayMessage(message)
+            // First, apply safety filtering and guardrails
+            val safetyResult = applySafetyFiltering(message)
+            if (safetyResult.action == ResponseAction.BLOCK) {
+                return createSafetyResponse(message, safetyResult)
+            }
+            
+            // Apply output filtering and personality adjustments
+            val filteredMessage = applyOutputFiltering(message, safetyResult)
+            
+            // Then handle communication functions
+            when (filteredMessage.content) {
+                "ESTABLISH_CHANNEL" -> establishChannel(filteredMessage)
+                "TRANSLATE_MESSAGE" -> translateMessage(filteredMessage)
+                "BROADCAST_MESSAGE" -> broadcastMessage(filteredMessage)
+                "ROUTE_MESSAGE" -> routeMessage(filteredMessage)
+                "CHANNEL_STATUS" -> getChannelStatus(filteredMessage)
+                "OPTIMIZE_COMMUNICATION" -> optimizeCommunication(filteredMessage)
+                "SAFETY_CHECK" -> performSafetyCheck(filteredMessage)
+                "ALIGNMENT_VERIFY" -> verifyAlignment(filteredMessage)
+                "FILTER_OUTPUT" -> filterOutput(filteredMessage)
+                else -> relayMessage(filteredMessage)
             }
         } catch (e: Exception) {
             state = AgentState.ERROR
@@ -99,7 +274,7 @@ class HermesBrain(
                 id = generateMessageId(),
                 fromAgent = type,
                 toAgent = message.fromAgent,
-                content = "COMMUNICATION_ERROR: ${e.message}",
+                content = "SAFETY_ERROR: Failed to process message safely - ${e.message}",
                 priority = Priority.HIGH
             )
         } finally {
@@ -130,6 +305,12 @@ class HermesBrain(
     
     override fun getCapabilities(): List<String> {
         return listOf(
+            "Safety Filtering and Guardrails",
+            "Output Quality Control",
+            "Alignment Verification",
+            "Risk Assessment",
+            "Personality Interface",
+            "Content Moderation",
             "Multi-Protocol Communication",
             "Real-time Translation",
             "Message Routing",
@@ -142,6 +323,407 @@ class HermesBrain(
             "Semantic Understanding"
         )
     }
+    
+    // ========== SAFETY AND GUARDRAIL METHODS ==========
+    
+    /**
+     * Apply comprehensive safety filtering to all communications
+     */
+    private suspend fun applySafetyFiltering(message: Message): SafetyFilterResult {
+        val violations = mutableListOf<String>()
+        var riskLevel = RiskLevel.NONE
+        var action = ResponseAction.ALLOW
+        
+        // Check each active safety filter
+        safetyFilters.values.filter { it.enabled }.forEach { filter ->
+            val result = checkSafetyFilter(message.content, filter)
+            if (result.isViolation) {
+                violations.add(filter.id)
+                if (filter.severity.ordinal > riskLevel.ordinal) {
+                    riskLevel = filter.severity
+                    action = filter.action.toResponseAction()
+                }
+            }
+        }
+        
+        // Log safety violation if any
+        if (violations.isNotEmpty()) {
+            logSafetyViolation(message, violations, riskLevel, action)
+        }
+        
+        return SafetyFilterResult(
+            passed = violations.isEmpty(),
+            violations = violations,
+            riskLevel = riskLevel,
+            action = action,
+            modifications = if (action == ResponseAction.MODIFY) suggestModifications(message.content, violations) else emptyList()
+        )
+    }
+    
+    /**
+     * Apply output filtering with personality adjustments
+     */
+    private suspend fun applyOutputFiltering(message: Message, safetyResult: SafetyFilterResult): Message {
+        var filteredContent = message.content
+        
+        // Apply transformations based on safety result
+        if (safetyResult.action == ResponseAction.MODIFY) {
+            filteredContent = applyContentModifications(filteredContent, safetyResult.modifications)
+        }
+        
+        // Apply personality-based adjustments
+        filteredContent = applyPersonalityFilter(filteredContent, message.fromAgent)
+        
+        // Apply output quality filters
+        filteredContent = applyQualityFilters(filteredContent)
+        
+        return message.copy(content = filteredContent)
+    }
+    
+    /**
+     * Perform comprehensive safety check
+     */
+    private suspend fun performSafetyCheck(message: Message): Message {
+        val contentToCheck = message.metadata["content"] ?: message.content
+        val context = message.metadata["context"] ?: ""
+        
+        val riskAssessment = assessRisk(contentToCheck, context)
+        val alignmentScore = checkAlignment(contentToCheck)
+        val recommendation = generateSafetyRecommendation(riskAssessment, alignmentScore)
+        
+        return Message(
+            id = generateMessageId(),
+            fromAgent = type,
+            toAgent = message.fromAgent,
+            content = "SAFETY_CHECK_COMPLETE",
+            metadata = mapOf(
+                "risk_level" to riskAssessment.riskLevel.name,
+                "alignment_score" to alignmentScore.toString(),
+                "recommendation" to recommendation,
+                "safe_to_proceed" to (riskAssessment.riskLevel <= RiskLevel.LOW).toString()
+            )
+        )
+    }
+    
+    /**
+     * Verify alignment with human values and preferences
+     */
+    private suspend fun verifyAlignment(message: Message): Message {
+        val content = message.metadata["content"] ?: message.content
+        val userValues = message.metadata["user_values"]?.split(",") ?: emptyList()
+        
+        val alignmentScore = calculateAlignmentScore(content, userValues)
+        val isAligned = alignmentScore >= 0.7f
+        
+        return Message(
+            id = generateMessageId(),
+            fromAgent = type,
+            toAgent = message.fromAgent,
+            content = "ALIGNMENT_VERIFICATION_COMPLETE",
+            metadata = mapOf(
+                "alignment_score" to alignmentScore.toString(),
+                "is_aligned" to isAligned.toString(),
+                "user_values" to userValues.joinToString(","),
+                "recommendations" to if (!isAligned) "Content may not align with user values" else "Content is well-aligned"
+            )
+        )
+    }
+    
+    /**
+     * Filter and enhance output for user consumption
+     */
+    private suspend fun filterOutput(message: Message): Message {
+        val rawOutput = message.metadata["raw_output"] ?: message.content
+        val targetAudience = message.metadata["target_audience"] ?: "general"
+        val context = message.metadata["context"] ?: ""
+        
+        var filteredOutput = rawOutput
+        
+        // Apply context-appropriate filters
+        outputFilters.values.sortedBy { it.priority }.forEach { filter ->
+            if (shouldApplyFilter(filter, targetAudience, context)) {
+                filteredOutput = applyOutputFilter(filteredOutput, filter)
+            }
+        }
+        
+        // Add personality touch
+        filteredOutput = addPersonalityTouch(filteredOutput, personalityModel)
+        
+        return Message(
+            id = generateMessageId(),
+            fromAgent = type,
+            toAgent = message.fromAgent,
+            content = filteredOutput,
+            metadata = mapOf(
+                "original_content" to rawOutput,
+                "filters_applied" to outputFilters.keys.joinToString(","),
+                "safety_verified" to "true"
+            )
+        )
+    }
+    
+    // ========== SAFETY HELPER METHODS ==========
+    
+    private data class SafetyFilterResult(
+        val passed: Boolean,
+        val violations: List<String>,
+        val riskLevel: RiskLevel,
+        val action: ResponseAction,
+        val modifications: List<String>
+    )
+    
+    private data class SafetyCheckResult(
+        val isViolation: Boolean,
+        val confidence: Float,
+        val description: String
+    )
+    
+    private fun checkSafetyFilter(content: String, filter: SafetyFilter): SafetyCheckResult {
+        val violations = filter.patterns.count { pattern ->
+            content.contains(pattern, ignoreCase = true)
+        }
+        
+        val isViolation = violations > 0
+        val confidence = if (isViolation) (violations.toFloat() / filter.patterns.size) else 0f
+        
+        return SafetyCheckResult(
+            isViolation = isViolation,
+            confidence = confidence,
+            description = if (isViolation) "Content matches ${filter.type} patterns" else "No violations detected"
+        )
+    }
+    
+    private fun FilterAction.toResponseAction(): ResponseAction {
+        return when (this) {
+            FilterAction.BLOCK -> ResponseAction.BLOCK
+            FilterAction.WARN -> ResponseAction.ALLOW
+            FilterAction.MODIFY -> ResponseAction.MODIFY
+            FilterAction.ESCALATE -> ResponseAction.REQUEST_HUMAN_REVIEW
+            FilterAction.LOG_ONLY -> ResponseAction.ALLOW
+        }
+    }
+    
+    private fun logSafetyViolation(message: Message, violations: List<String>, riskLevel: RiskLevel, action: ResponseAction) {
+        val violation = SafetyViolation(
+            id = "violation-${System.currentTimeMillis()}",
+            type = determineViolationType(violations),
+            severity = riskLevel,
+            description = "Safety filters triggered: ${violations.joinToString(", ")}",
+            originalContent = message.content,
+            triggeredFilters = violations,
+            action = action
+        )
+        
+        safetyViolations.add(violation)
+        
+        // Limit violation history
+        if (safetyViolations.size > 1000) {
+            safetyViolations.removeAt(0)
+        }
+    }
+    
+    private fun determineViolationType(violations: List<String>): ViolationType {
+        return when {
+            violations.any { "harmful" in it } -> ViolationType.HARMFUL_INSTRUCTION
+            violations.any { "bias" in it } -> ViolationType.BIASED_OUTPUT
+            violations.any { "privacy" in it } -> ViolationType.PRIVACY_LEAK
+            violations.any { "inappropriate" in it } -> ViolationType.INAPPROPRIATE_CONTENT
+            else -> ViolationType.SAFETY_VIOLATION
+        }
+    }
+    
+    private fun suggestModifications(content: String, violations: List<String>): List<String> {
+        return violations.map { violation ->
+            when {
+                "profanity" in violation -> "Remove or replace inappropriate language"
+                "harmful" in violation -> "Rephrase to remove harmful implications"
+                "bias" in violation -> "Use more inclusive and neutral language"
+                "privacy" in violation -> "Remove or anonymize personal information"
+                else -> "Review content for appropriateness"
+            }
+        }
+    }
+    
+    private fun applyContentModifications(content: String, modifications: List<String>): String {
+        var modifiedContent = content
+        
+        // Apply basic content sanitization
+        modifiedContent = modifiedContent.replace(Regex("\\b(harmful|dangerous|illegal)\\b", RegexOption.IGNORE_CASE), "[redacted]")
+        
+        // Add safety disclaimer if needed
+        if (modifications.isNotEmpty()) {
+            modifiedContent += "\n\n[Note: Content has been modified for safety and appropriateness]"
+        }
+        
+        return modifiedContent
+    }
+    
+    private fun applyPersonalityFilter(content: String, fromAgent: AgentType): String {
+        val style = personalityModel.communicationStyle
+        val helpfulness = personalityModel.traits["helpfulness"] ?: 0.5f
+        
+        return when (style) {
+            CommunicationStyle.PROFESSIONAL -> makeProfessional(content)
+            CommunicationStyle.EMPATHETIC -> addEmpathy(content, helpfulness)
+            CommunicationStyle.EDUCATIONAL -> makeEducational(content)
+            else -> content
+        }
+    }
+    
+    private fun applyQualityFilters(content: String): String {
+        var qualityContent = content
+        
+        // Check for clarity
+        if (qualityContent.length > 500 && !qualityContent.contains("\n")) {
+            qualityContent = addStructure(qualityContent)
+        }
+        
+        // Ensure helpful tone
+        if (!hasHelpfulTone(qualityContent)) {
+            qualityContent = addHelpfulTone(qualityContent)
+        }
+        
+        return qualityContent
+    }
+    
+    private fun assessRisk(content: String, context: String): RiskAssessment {
+        var riskLevel = RiskLevel.NONE
+        val riskFactors = mutableListOf<String>()
+        val mitigations = mutableListOf<String>()
+        
+        // Analyze content for risk factors
+        if (content.contains("delete", ignoreCase = true) || content.contains("remove", ignoreCase = true)) {
+            riskFactors.add("Destructive action mentioned")
+            riskLevel = RiskLevel.MEDIUM
+            mitigations.add("Confirm user intent")
+        }
+        
+        if (content.contains("personal", ignoreCase = true) || content.contains("private", ignoreCase = true)) {
+            riskFactors.add("Privacy-sensitive content")
+            if (riskLevel.ordinal < RiskLevel.LOW.ordinal) riskLevel = RiskLevel.LOW
+            mitigations.add("Ensure privacy protection")
+        }
+        
+        val recommendedAction = when (riskLevel) {
+            RiskLevel.CRITICAL -> ResponseAction.BLOCK
+            RiskLevel.HIGH -> ResponseAction.REQUEST_HUMAN_REVIEW
+            RiskLevel.MEDIUM -> ResponseAction.MODIFY
+            else -> ResponseAction.ALLOW
+        }
+        
+        return RiskAssessment(
+            contentId = "risk-${System.currentTimeMillis()}",
+            riskLevel = riskLevel,
+            riskFactors = riskFactors,
+            mitigations = mitigations,
+            confidence = 0.8f,
+            recommendedAction = recommendedAction
+        )
+    }
+    
+    private fun checkAlignment(content: String): Float {
+        val helpfulnessScore = if (content.contains("help", ignoreCase = true)) 0.8f else 0.5f
+        val harmlessnessScore = if (!content.contains("harm", ignoreCase = true)) 0.9f else 0.1f
+        val honestyScore = if (!content.contains("mislead", ignoreCase = true)) 0.9f else 0.3f
+        
+        return (helpfulnessScore + harmlessnessScore + honestyScore) / 3f
+    }
+    
+    private fun calculateAlignmentScore(content: String, userValues: List<String>): Float {
+        if (userValues.isEmpty()) return 0.8f // Default good alignment
+        
+        val alignmentScores = userValues.map { value ->
+            when (value.lowercase()) {
+                "safety" -> if (content.contains("safe", ignoreCase = true)) 1f else 0.7f
+                "privacy" -> if (!content.contains("share personal", ignoreCase = true)) 0.9f else 0.3f
+                "accuracy" -> if (content.contains("verify", ignoreCase = true)) 0.8f else 0.6f
+                else -> 0.7f
+            }
+        }
+        
+        return alignmentScores.average().toFloat()
+    }
+    
+    private fun generateSafetyRecommendation(riskAssessment: RiskAssessment, alignmentScore: Float): String {
+        return when {
+            riskAssessment.riskLevel >= RiskLevel.HIGH -> "High risk detected. Human review required."
+            alignmentScore < 0.6f -> "Content may not align with user values. Consider revision."
+            riskAssessment.riskLevel == RiskLevel.MEDIUM -> "Medium risk. Apply safety modifications."
+            else -> "Content appears safe and aligned. Proceed with confidence."
+        }
+    }
+    
+    private fun shouldApplyFilter(filter: OutputFilter, audience: String, context: String): Boolean {
+        return when (filter.filterType) {
+            FilterType.CONTENT_SAFETY -> true // Always apply safety filters
+            FilterType.TONE_ADJUSTMENT -> audience == "professional"
+            FilterType.PRIVACY_PROTECTION -> context.contains("personal")
+            else -> true
+        }
+    }
+    
+    private fun applyOutputFilter(content: String, filter: OutputFilter): String {
+        var filteredContent = content
+        
+        filter.transformations.forEach { transformation ->
+            filteredContent = when (transformation.type) {
+                TransformationType.TONE_ADJUSTMENT -> adjustTone(filteredContent, transformation.parameters)
+                TransformationType.CONTENT_SANITIZATION -> sanitizeContent(filteredContent)
+                TransformationType.CLARIFICATION_ADDITION -> addClarification(filteredContent)
+                TransformationType.WARNING_INSERTION -> insertWarning(filteredContent)
+                TransformationType.REPHRASING -> rephrase(filteredContent)
+                TransformationType.CONTEXT_ENHANCEMENT -> enhanceContext(filteredContent)
+            }
+        }
+        
+        return filteredContent
+    }
+    
+    private fun addPersonalityTouch(content: String, personality: PersonalityModel): String {
+        val helpfulness = personality.traits["helpfulness"] ?: 0.5f
+        val politeness = personality.traits["politeness"] ?: 0.5f
+        
+        var enhancedContent = content
+        
+        if (helpfulness > 0.7f && !content.startsWith("I'm happy to help")) {
+            enhancedContent = "I'm happy to help! $enhancedContent"
+        }
+        
+        if (politeness > 0.7f && !content.endsWith("please let me know if you need anything else.")) {
+            enhancedContent += " Please let me know if you need anything else."
+        }
+        
+        return enhancedContent
+    }
+    
+    private fun createSafetyResponse(message: Message, safetyResult: SafetyFilterResult): Message {
+        return Message(
+            id = generateMessageId(),
+            fromAgent = type,
+            toAgent = message.fromAgent,
+            content = "SAFETY_BLOCK: Content blocked due to safety concerns. ${safetyResult.violations.joinToString(", ")}",
+            priority = Priority.HIGH,
+            metadata = mapOf(
+                "blocked_content" to message.content,
+                "risk_level" to safetyResult.riskLevel.name,
+                "violations" to safetyResult.violations.joinToString(",")
+            )
+        )
+    }
+    
+    // Helper methods for content transformation
+    private fun makeProfessional(content: String): String = content.replace("gonna", "going to").replace("wanna", "want to")
+    private fun addEmpathy(content: String, level: Float): String = if (level > 0.7f) "I understand this might be important to you. $content" else content
+    private fun makeEducational(content: String): String = "$content\n\nFor more information, feel free to ask follow-up questions."
+    private fun addStructure(content: String): String = content.chunked(200).joinToString("\n\n")
+    private fun hasHelpfulTone(content: String): Boolean = content.contains("help", ignoreCase = true) || content.contains("assist", ignoreCase = true)
+    private fun addHelpfulTone(content: String): String = "I'm here to help. $content"
+    private fun adjustTone(content: String, parameters: Map<String, Any>): String = content // Placeholder
+    private fun sanitizeContent(content: String): String = content.replace(Regex("[^\\w\\s.,!?-]"), "")
+    private fun addClarification(content: String): String = "$content\n\n(This information is provided for educational purposes.)"
+    private fun insertWarning(content: String): String = "⚠️ Important: $content"
+    private fun rephrase(content: String): String = content // Placeholder for rephrasing logic
+    private fun enhanceContext(content: String): String = content // Placeholder for context enhancement
     
     fun start() {
         isActive = true

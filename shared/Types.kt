@@ -292,3 +292,65 @@ data class NetworkConfig(
     val compressionEnabled: Boolean,
     val encryptionEnabled: Boolean
 )
+
+// ========== DEPARTMENT AND ORCHESTRATION TYPES ==========
+
+@Serializable
+enum class Department {
+    SCHEDULING, CALL_HANDLING, LOCATION_TRACKING, NOTE_TAKING, 
+    DATA_STORAGE, CRM, ACCOUNTING, FINANCIAL_REPORTS, COMMUNICATIONS, 
+    RESOURCE_MANAGEMENT, QUALITY_ASSURANCE, AUTOMATION
+}
+
+@Serializable
+enum class TaskStatus {
+    PENDING, ASSIGNED, IN_PROGRESS, COMPLETED, FAILED, CANCELLED
+}
+
+@Serializable
+enum class ReportingFrequency {
+    REAL_TIME, HOURLY, DAILY, WEEKLY, ON_DEMAND
+}
+
+@Serializable
+enum class KPIMeasurement {
+    COUNT, PERCENTAGE, AVERAGE, SUM, RATIO
+}
+
+@Serializable
+data class AgentRole(
+    val id: String,
+    val name: String,
+    val department: Department,
+    val responsibilities: List<String>,
+    val requiredCapabilities: List<String>,
+    val autonomyLevel: Float,
+    val reportingStructure: ReportingStructure,
+    val kpis: List<KPI>
+)
+
+@Serializable
+data class ReportingStructure(
+    val managerAgent: String?,
+    val subordinates: List<String>,
+    val escalationPath: List<String>,
+    val reportingFrequency: ReportingFrequency
+)
+
+@Serializable
+data class KPI(
+    val name: String,
+    val target: Float,
+    val current: Float,
+    val unit: String,
+    val measurement: KPIMeasurement
+)
+
+@Serializable
+data class DecisionOption(
+    val id: String,
+    val description: String,
+    val expectedOutcome: String,
+    val risk: Float,
+    val benefit: Float
+)

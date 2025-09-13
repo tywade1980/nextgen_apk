@@ -9,8 +9,9 @@ import kotlinx.coroutines.flow.*
 
 /**
  * MainOrchestrator - Central Coordination and Control System
- * Orchestrates all agents, applications, and environment components
- * Provides high-level system coordination, emergency management, and strategic planning
+ * Orchestrates all agents, applications, and environment components through the AgentOrchestrator.
+ * Provides high-level system coordination, emergency management, and strategic planning.
+ * Works with HRMModel as the central reasoning brain and AgentOrchestrator for operational management.
  */
 class MainOrchestrator(
     private val config: SystemConfig
@@ -18,11 +19,13 @@ class MainOrchestrator(
     
     // Core Components
     private lateinit var livingEnv: LivingEnv
-    private lateinit var mrm: MRM
+    private lateinit var hrmModel: HRMModel
     private lateinit var hermesBrain: HermesBrain
     private lateinit var bigDaddyAgent: BigDaddyAgent
-    private lateinit var hrmModel: HRMModel
     private lateinit var eliteHuman: EliteHuman
+    
+    // Agent Management
+    private lateinit var agentOrchestrator: AgentOrchestrator
     
     // Applications
     private lateinit var callScreenService: CallScreenService
@@ -140,11 +143,17 @@ class MainOrchestrator(
             // Initialize environment first
             livingEnv = LivingEnv(config.environmentConfig)
             
-            // Initialize agents
-            mrm = MRM("mrm-main", config.agentConfigs[AgentType.MRM]!!)
-            hermesBrain = HermesBrain("hermes-main", config.agentConfigs[AgentType.HERMES_BRAIN]!!)
+            // Initialize HRMModel as the central reasoning brain first
+            hrmModel = HRMModel("hrm-central", config.agentConfigs[AgentType.HRM_MODEL]!!)
+            
+            // Initialize HermesBrain as safety-focused mouthpiece  
+            hermesBrain = HermesBrain("hermes-safety", config.agentConfigs[AgentType.HERMES_BRAIN]!!)
+            
+            // Initialize AgentOrchestrator for role and automation management
+            agentOrchestrator = AgentOrchestrator(config, hrmModel)
+            
+            // Initialize other core agents
             bigDaddyAgent = BigDaddyAgent("bigdaddy-main", config.agentConfigs[AgentType.BIG_DADDY]!!)
-            hrmModel = HRMModel("hrm-main", config.agentConfigs[AgentType.HRM_MODEL]!!)
             eliteHuman = EliteHuman("elite-main", config.agentConfigs[AgentType.ELITE_HUMAN]!!)
             
             // Initialize applications
@@ -158,7 +167,7 @@ class MainOrchestrator(
             // Setup system monitoring
             initializeSystemMonitoring()
             
-            println("NextGen AI OS initialized successfully")
+            println("NextGen AI OS initialized successfully with new architecture")
             
         } catch (e: Exception) {
             println("Failed to initialize NextGen AI OS: ${e.message}")
@@ -530,42 +539,46 @@ class MainOrchestrator(
     // Private implementation methods
     private suspend fun startAgents() {
         try {
-            mrm.start()
+            // Start HRMModel first as the central reasoning brain
+            hrmModel.start()
             recordEvent(OrchestrationEvent(
                 id = generateEventId(),
                 type = EventType.COMPONENT_CONNECTED,
                 source = "orchestrator",
-                target = "mrm",
-                data = mapOf("status" to "started"),
-                priority = Priority.HIGH
+                target = "hrm_model_central_brain",
+                data = mapOf("status" to "started", "role" to "central_reasoning_brain"),
+                priority = Priority.CRITICAL
             ))
             
+            // Start HermesBrain as safety-focused mouthpiece
             hermesBrain.start()
             recordEvent(OrchestrationEvent(
                 id = generateEventId(),
                 type = EventType.COMPONENT_CONNECTED,
                 source = "orchestrator",
-                target = "hermes_brain",
-                data = mapOf("status" to "started"),
+                target = "hermes_safety_mouthpiece",
+                data = mapOf("status" to "started", "role" to "safety_guardrails_output_filter"),
                 priority = Priority.HIGH
             ))
             
+            // Start AgentOrchestrator for role and automation management
+            agentOrchestrator.start()
+            recordEvent(OrchestrationEvent(
+                id = generateEventId(),
+                type = EventType.COMPONENT_CONNECTED,
+                source = "orchestrator",
+                target = "agent_orchestrator",
+                data = mapOf("status" to "started", "role" to "role_automation_management"),
+                priority = Priority.HIGH
+            ))
+            
+            // Start other core agents
             bigDaddyAgent.start()
             recordEvent(OrchestrationEvent(
                 id = generateEventId(),
                 type = EventType.COMPONENT_CONNECTED,
                 source = "orchestrator",
                 target = "big_daddy",
-                data = mapOf("status" to "started"),
-                priority = Priority.HIGH
-            ))
-            
-            hrmModel.start()
-            recordEvent(OrchestrationEvent(
-                id = generateEventId(),
-                type = EventType.COMPONENT_CONNECTED,
-                source = "orchestrator",
-                target = "hrm_model",
                 data = mapOf("status" to "started"),
                 priority = Priority.HIGH
             ))
@@ -580,6 +593,9 @@ class MainOrchestrator(
                 priority = Priority.HIGH
             ))
             
+            // Create department-level specialized agents
+            createDepartmentAgents()
+            
         } catch (e: Exception) {
             throw Exception("Failed to start agents: ${e.message}")
         }
@@ -587,13 +603,78 @@ class MainOrchestrator(
     
     private suspend fun stopAgents() {
         try {
+            agentOrchestrator.stop()
             eliteHuman.stop()
             hrmModel.stop()
             bigDaddyAgent.stop()
             hermesBrain.stop()
-            mrm.stop()
         } catch (e: Exception) {
             println("Error stopping agents: ${e.message}")
+        }
+    }
+    
+    /**
+     * Create department-level specialized agents through the AgentOrchestrator
+     */
+    private suspend fun createDepartmentAgents() {
+        try {
+            // Create specialized agents for each department
+            val departments = listOf(
+                Department.SCHEDULING,
+                Department.CALL_HANDLING,
+                Department.LOCATION_TRACKING,
+                Department.NOTE_TAKING,
+                Department.DATA_STORAGE,
+                Department.CRM,
+                Department.ACCOUNTING,
+                Department.FINANCIAL_REPORTS,
+                Department.COMMUNICATIONS,
+                Department.RESOURCE_MANAGEMENT,
+                Department.QUALITY_ASSURANCE,
+                Department.AUTOMATION
+            )
+            
+            departments.forEach { department ->
+                // Create role definition for the department
+                val role = AgentRole(
+                    id = "role-${department.name.lowercase()}-manager",
+                    name = "${department.name} Manager",
+                    department = department,
+                    responsibilities = getDepartmentResponsibilities(department),
+                    requiredCapabilities = getDepartmentCapabilities(department),
+                    autonomyLevel = getDepartmentAutonomyLevel(department),
+                    reportingStructure = ReportingStructure(
+                        managerAgent = "hrm-central", // Reports to HRM
+                        subordinates = emptyList(),
+                        escalationPath = listOf("hrm-central", "bigdaddy-main"),
+                        reportingFrequency = ReportingFrequency.DAILY
+                    ),
+                    kpis = getDepartmentKPIs(department)
+                )
+                
+                // Create agent through orchestrator
+                val agentId = agentOrchestrator.createAgent(department, role)
+                
+                recordEvent(OrchestrationEvent(
+                    id = generateEventId(),
+                    type = EventType.COMPONENT_CONNECTED,
+                    source = "orchestrator",
+                    target = agentId,
+                    data = mapOf(
+                        "department" to department.name,
+                        "role" to role.name,
+                        "autonomy_level" to role.autonomyLevel.toString(),
+                        "reports_to" to "hrm-central"
+                    ),
+                    priority = Priority.NORMAL
+                ))
+            }
+            
+            println("Department agents created successfully")
+            
+        } catch (e: Exception) {
+            println("Error creating department agents: ${e.message}")
+            throw e
         }
     }
     
@@ -1107,6 +1188,147 @@ class MainOrchestrator(
             metadata = metadata
         )
         return routeMessage(message)
+    }
+    
+    // ========== DEPARTMENT CONFIGURATION HELPERS ==========
+    
+    private fun getDepartmentResponsibilities(department: Department): List<String> {
+        return when (department) {
+            Department.SCHEDULING -> listOf(
+                "Manage calendars and appointments",
+                "Optimize scheduling conflicts",
+                "Handle booking requests",
+                "Coordinate time-sensitive tasks"
+            )
+            Department.CALL_HANDLING -> listOf(
+                "Answer and screen incoming calls",
+                "Route calls to appropriate departments",
+                "Handle customer inquiries",
+                "Perform emergency detection and response"
+            )
+            Department.LOCATION_TRACKING -> listOf(
+                "Track location data",
+                "Provide navigation assistance",
+                "Monitor movement patterns",
+                "Generate location-based insights"
+            )
+            Department.NOTE_TAKING -> listOf(
+                "Capture and organize notes",
+                "Extract key information",
+                "Summarize meetings and conversations",
+                "Manage documentation workflow"
+            )
+            Department.DATA_STORAGE -> listOf(
+                "Manage data storage and retrieval",
+                "Ensure data security and backup",
+                "Optimize storage performance",
+                "Handle data lifecycle management"
+            )
+            Department.CRM -> listOf(
+                "Manage customer relationships",
+                "Track customer interactions",
+                "Generate customer insights",
+                "Maintain customer database"
+            )
+            Department.ACCOUNTING -> listOf(
+                "Process financial transactions",
+                "Maintain accounting records",
+                "Generate financial reports",
+                "Ensure compliance with regulations"
+            )
+            Department.FINANCIAL_REPORTS -> listOf(
+                "Generate financial analysis",
+                "Create budget reports",
+                "Monitor financial performance",
+                "Provide financial insights"
+            )
+            Department.COMMUNICATIONS -> listOf(
+                "Manage internal communications",
+                "Handle external correspondence",
+                "Coordinate messaging systems",
+                "Ensure communication security"
+            )
+            Department.RESOURCE_MANAGEMENT -> listOf(
+                "Allocate system resources",
+                "Monitor resource utilization",
+                "Optimize resource efficiency",
+                "Handle capacity planning"
+            )
+            Department.QUALITY_ASSURANCE -> listOf(
+                "Monitor system quality",
+                "Perform quality checks",
+                "Ensure compliance standards",
+                "Handle quality improvement"
+            )
+            Department.AUTOMATION -> listOf(
+                "Manage automated processes",
+                "Optimize workflow automation",
+                "Monitor automation performance",
+                "Handle automation failures"
+            )
+        }
+    }
+    
+    private fun getDepartmentCapabilities(department: Department): List<String> {
+        return when (department) {
+            Department.SCHEDULING -> listOf("Calendar Management", "Time Optimization", "Conflict Resolution")
+            Department.CALL_HANDLING -> listOf("Communication", "Routing", "Customer Service", "Emergency Detection")
+            Department.LOCATION_TRACKING -> listOf("GPS Tracking", "Navigation", "Location Analysis")
+            Department.NOTE_TAKING -> listOf("Information Extraction", "Summarization", "Documentation")
+            Department.DATA_STORAGE -> listOf("Database Management", "Data Security", "Backup Systems")
+            Department.CRM -> listOf("Customer Relations", "Data Analysis", "Report Generation")
+            Department.ACCOUNTING -> listOf("Financial Processing", "Compliance", "Record Keeping")
+            Department.FINANCIAL_REPORTS -> listOf("Financial Analysis", "Reporting", "Budget Management")
+            Department.COMMUNICATIONS -> listOf("Message Management", "Security", "Protocol Handling")
+            Department.RESOURCE_MANAGEMENT -> listOf("Resource Allocation", "Performance Monitoring", "Optimization")
+            Department.QUALITY_ASSURANCE -> listOf("Quality Control", "Testing", "Compliance Monitoring")
+            Department.AUTOMATION -> listOf("Process Automation", "Workflow Management", "Error Handling")
+        }
+    }
+    
+    private fun getDepartmentAutonomyLevel(department: Department): Float {
+        return when (department) {
+            Department.DATA_STORAGE, Department.NOTE_TAKING, Department.AUTOMATION -> 0.9f // High autonomy for routine tasks
+            Department.ACCOUNTING, Department.FINANCIAL_REPORTS -> 0.6f // Medium autonomy, requires oversight
+            Department.CALL_HANDLING, Department.CRM, Department.COMMUNICATIONS -> 0.7f // Medium-high autonomy
+            Department.SCHEDULING, Department.LOCATION_TRACKING -> 0.8f // High autonomy for operational tasks
+            Department.RESOURCE_MANAGEMENT, Department.QUALITY_ASSURANCE -> 0.75f // Medium-high with some oversight
+        }
+    }
+    
+    private fun getDepartmentKPIs(department: Department): List<KPI> {
+        return when (department) {
+            Department.SCHEDULING -> listOf(
+                KPI("Appointment Success Rate", 95f, 0f, "%", KPIMeasurement.PERCENTAGE),
+                KPI("Response Time", 2f, 0f, "minutes", KPIMeasurement.AVERAGE),
+                KPI("Conflict Resolution Rate", 98f, 0f, "%", KPIMeasurement.PERCENTAGE)
+            )
+            Department.CALL_HANDLING -> listOf(
+                KPI("Call Answer Rate", 98f, 0f, "%", KPIMeasurement.PERCENTAGE),
+                KPI("Customer Satisfaction", 4.5f, 0f, "stars", KPIMeasurement.AVERAGE),
+                KPI("Emergency Response Time", 30f, 0f, "seconds", KPIMeasurement.AVERAGE)
+            )
+            Department.CRM -> listOf(
+                KPI("Data Accuracy", 99f, 0f, "%", KPIMeasurement.PERCENTAGE),
+                KPI("Customer Retention", 95f, 0f, "%", KPIMeasurement.PERCENTAGE),
+                KPI("Response Time", 1f, 0f, "hours", KPIMeasurement.AVERAGE)
+            )
+            Department.ACCOUNTING -> listOf(
+                KPI("Transaction Accuracy", 99.9f, 0f, "%", KPIMeasurement.PERCENTAGE),
+                KPI("Compliance Rate", 100f, 0f, "%", KPIMeasurement.PERCENTAGE),
+                KPI("Report Timeliness", 95f, 0f, "%", KPIMeasurement.PERCENTAGE)
+            )
+            Department.QUALITY_ASSURANCE -> listOf(
+                KPI("Quality Score", 95f, 0f, "%", KPIMeasurement.PERCENTAGE),
+                KPI("Issue Detection Rate", 99f, 0f, "%", KPIMeasurement.PERCENTAGE),
+                KPI("Resolution Time", 4f, 0f, "hours", KPIMeasurement.AVERAGE)
+            )
+            else -> listOf(
+                KPI("Task Completion Rate", 90f, 0f, "%", KPIMeasurement.PERCENTAGE),
+                KPI("Accuracy", 95f, 0f, "%", KPIMeasurement.PERCENTAGE),
+                KPI("Response Time", 5f, 0f, "minutes", KPIMeasurement.AVERAGE)
+            )
+        }
     }
 }
 
